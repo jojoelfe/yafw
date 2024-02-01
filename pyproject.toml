@@ -29,7 +29,8 @@ dependencies = [
   "pydantic>=2",
   "pycistem",
   "starfile",
-  "rich"
+  "rich",
+  "mrcfile"
 ]
 
 [project.scripts]

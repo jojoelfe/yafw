@@ -1,6 +1,6 @@
 import typer
 from pathlib import Path
-
+from yafw.project_management import Context, Global
 app = typer.Typer()
 
 @app.command()
@@ -13,7 +13,7 @@ def create_project(
 ):
     import starfile
     from shutil import copy
-    from project_management import FrealignProject, FrealignBinnedStack
+    from yafw.project_management import FrealignProject, FrealignBinnedStack
 
     project_dir = Path.cwd() / name
     project_dir.mkdir()
@@ -67,8 +67,46 @@ def create_project(
 
 @app.command()
 def create_binned_stack(
-    pixelsize: float = typer.Argument(..., help="Pixel size of the binned stack"),
+    ctx: Context,
+    bin: int = typer.Argument(..., help="Factor to bin by"),
+):
+    if ctx.obj is None:
+        typer.echo("Please run in a FREALIGN project folder. Exiting.")
+        raise typer.Exit(code=1)
+    
+    from pycistem.programs.resample import ResampleParameters, run
+    import mrcfile
+    from yafw.project_management import FrealignBinnedStack
+
+    with mrcfile.open(ctx.obj.project.stacks[0].filename, mode="r") as f:
+        orig_size = f.header.nx
+    bin_to = round(orig_size / bin)
+    par = ResampleParameters(
+        input_filename=str(ctx.obj.project.stacks[0].filename),
+        output_filename=str(ctx.obj.project.path / f"{ctx.obj.project.name}B{bin}.mrc"),
+        new_x_size=bin_to,
+        new_y_size=bin_to,
+    )
+    run(par)
+    ctx.obj.project.stacks.append(FrealignBinnedStack(
+        filename=par.output_filename,
+        pixel_size_A=ctx.obj.project.stacks[0].pixel_size_A * (orig_size / bin_to)
+    ))
+    ctx.obj.project.save()
+
+@app.command()
+def create_job(
+    ctx: Context,
 ):
     pass
+
+@app.callback()
+def main(
+    ctx: Context,
+):
+    from yafw.project_management import FrealignProject
+    if (Path.cwd() / f"{Path.cwd().name}.json").exists():
+        ctx.obj = Global(project=FrealignProject.open(f"{Path.cwd() / Path.cwd().name}.json"))
+
 if __name__ == "__main__":
     app()
