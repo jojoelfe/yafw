@@ -30,7 +30,8 @@ dependencies = [
   "pycistem",
   "starfile",
   "rich",
-  "mrcfile"
+  "mrcfile",
+  "matplotlib"
 ]
 
 [project.scripts]
