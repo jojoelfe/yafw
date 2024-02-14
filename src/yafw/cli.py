@@ -148,6 +148,81 @@ def create_job(
     ctx.obj.project.save()
 
 @app.command()
+def fsc_results(ctx: Context):
+    from yafw.frealign_jobs import parse_job
+    if ctx.obj is None or ctx.obj.job is None:
+        typer.echo("Please run in a FREALIGN job folder. Exiting.")
+        raise typer.Exit(code=1)
+    job_data = parse_job(ctx.obj.project, ctx.obj.job)
+    #print(job_data[0][-1])
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as tick
+    import numpy as np
+    for i, class_list in enumerate(job_data):
+        last_round = class_list[-1]
+        resolution = last_round.FSC.resolution
+        FSC_values = last_round.FSC.fsc_values
+        data_tuples = list(zip(resolution, FSC_values))
+        value_found = False
+
+        for resolution, fsc_value in data_tuples:
+            if fsc_value <= 0.143:
+                print(f"Resolution: {resolution}, FSC Value: {fsc_value}, Class {i+1}")
+                value_found = True
+
+        if not value_found:
+            print(f"No value <= 0.143 in the Class {i+1}")
+
+    def on_legend_click(event):
+        legend = event.artist
+        index = event.ind[0]
+        line = legend.get_lines()[index]
+        line.set_visible(not line.get_visible())
+        plt.draw()
+   
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for i, class_list in enumerate(job_data):
+        last_round = class_list[-1]
+        number_values = len(last_round.FSC.resolution)
+        ax.plot(range(number_values),last_round.FSC.fsc_values,label=f"Class {i+1}")
+        
+        plt.xlim(number_values-1,0)
+        plt.ylim(-0.01,1.05)
+        def x_fmt(x, y):
+            if x>number_values-1:
+                return ""
+            return last_round.FSC.resolution[int(x)]
+    ax.xaxis.set_major_formatter(tick.FuncFormatter(x_fmt))
+    plt.axhline(0.143, color="black", ls=":")
+    plt.xlabel('Resolution (Å)')
+    plt.ylabel('FSC')
+    legend = plt.legend()
+    #plt.legend()
+    plt.gcf().canvas.mpl_connect('pick_event', on_legend_click)
+    plt.show()
+
+    fig2 = plt.figure()
+    ax = fig2.add_subplot(111)
+    for i, class_list in enumerate(job_data):
+        last_round = class_list[-1]
+        number_values = len(last_round.FSC.resolution)
+        ax.plot(range(number_values),last_round.FSC.part_fsc_values,label=f"Class {i+1}")
+        
+        plt.xlim(number_values-1,0)
+        plt.ylim(-0.01,1.05)
+        def x_fmt(x, y):
+            if x>number_values-1:
+                return ""
+            return last_round.FSC.resolution[int(x)]
+    ax.xaxis.set_major_formatter(tick.FuncFormatter(x_fmt))
+    plt.axhline(0.143, color="black", ls=":")
+    plt.xlabel('Resolution (Å)')
+    plt.ylabel('Part_FSC')
+    plt.legend()
+    plt.show()  
+
+@app.command()
 def job_status(ctx: Context):
     from yafw.frealign_jobs import parse_job
     if ctx.obj is None or ctx.obj.job is None:

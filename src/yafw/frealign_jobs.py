@@ -50,11 +50,11 @@ class FrealignResults(BaseModel):
     FSC: FSCCurve = FSCCurve()
 
 
-def parse_job(project: FrealignProject, job: FrealignJob):
-
+def parse_job(project: FrealignProject, job: FrealignJob) -> list[list[FrealignResults]]:
+    from rich.progress import track
     par_files = list(job.path.glob(f"*.par"))
     results = []
-    for par_file in par_files:
+    for par_file in track(par_files):
         if project is None:
             regexp = re.compile(r".+_(\d+)_r(\d+).par")
         else :
