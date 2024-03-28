@@ -1,4 +1,4 @@
-from yafw.project_management import FrealignJob, FrealignProject
+from yafw.project_management import FrealignJob, FrealignProject, FrealignParameters
 from pathlib import Path
 import re
 from pydantic import BaseModel
@@ -50,7 +50,16 @@ class FrealignResults(BaseModel):
     FSC: FSCCurve = FSCCurve()
 
 
-def parse_job(project: FrealignProject, job: FrealignJob) -> list[list[FrealignResults]]:
+
+def continue_job(project: FrealignProject, job: FrealignJob, nrounds: int = 1):
+    import shutil
+    current_params = FrealignParameters.open(job.path / "mparameters")
+    shutil.copy(job.path / "mparameters", job.path / f"mparameters_{current_params.start_process}_{current_params.end_process}")
+    current_params.start_process = current_params.end_process + 1
+    current_params.end_process = current_params.start_process + nrounds - 1 
+    current_params.render(job.path / "mparameters")
+
+def parse_job(project: FrealignProject, job: FrealignJob):
     from rich.progress import track
     par_files = list(job.path.glob(f"*.par"))
     results = []

@@ -131,11 +131,14 @@ class FrealignParameters(BaseModel):
     
     @classmethod
     def open(cls, filename):
+        import shlex
         with open(filename, "r") as f:
             data = f.readlines()
         out = cls()
         for line in data:
-            k, v, *_ = line.split("")
-            setattr(out, k, v)
+            k, *v = shlex.split(line)
+            if len(v) > 0:
+                setattr(out, k, v[0])
+        out = cls(**out.model_dump())
         return out
             

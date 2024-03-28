@@ -237,6 +237,16 @@ def job_status(ctx: Context):
     plt.legend()
     plt.show()
 
+@app.command()
+def continue_job(ctx: Context, nrounds: int = typer.Argument(1, help="Number of rounds to continue")):
+    from yafw.frealign_jobs import continue_job
+    if ctx.obj is None or ctx.obj.job is None:
+        typer.echo("Please run in a FREALIGN job folder. Exiting.")
+        raise typer.Exit(code=1)
+    continue_job(ctx.obj.project, ctx.obj.job, nrounds=nrounds)
+
+    
+
 @app.callback()
 def main(
     ctx: Context,
