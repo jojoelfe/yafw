@@ -245,6 +245,19 @@ def continue_job(ctx: Context, nrounds: int = typer.Argument(1, help="Number of 
         raise typer.Exit(code=1)
     continue_job(ctx.obj.project, ctx.obj.job, nrounds=nrounds)
 
+@app.command()
+def combine_classes(ctx: Context,
+                    name: str = typer.Argument(..., help="Name of the new particle set"),
+                    job_id: int = typer.Argument(..., help="Job ID to combine classes from"),
+                    class_numbers: list[str] = typer.Argument(..., help="Class numbers to combine"),
+                    iteration: int = typer.Option(-1, help="Iteration number to combine classes from, -1 is the latest")):
+    
+    from yafw.frealign_jobs import combine_classes
+    if ctx.obj is None:
+        typer.echo("Please run in a FREALIGN project folder. Exiting.")
+        raise typer.Exit(code=1)
+    job = list(filter(lambda x: x.id == job_id, ctx.obj.project.jobs))[0]
+    combine_classes(project=ctx.obj.project, name=name, job=job, class_numbers=class_numbers, iteration=iteration)
     
 
 @app.callback()

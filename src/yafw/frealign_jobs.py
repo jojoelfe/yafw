@@ -59,6 +59,13 @@ def continue_job(project: FrealignProject, job: FrealignJob, nrounds: int = 1):
     current_params.end_process = current_params.start_process + nrounds - 1 
     current_params.render(job.path / "mparameters")
 
+#def combine_classes(project: FrealignProject, 
+#                    name: str, 
+#                    job: FrealignJob,
+#                    class_numbers: list[int],
+#                    iteration: int = -1):
+    
+
 def parse_job(project: FrealignProject, job: FrealignJob):
     from rich.progress import track
     par_files = list(job.path.glob(f"*.par"))
