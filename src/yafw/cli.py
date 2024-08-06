@@ -1,4 +1,5 @@
 import typer
+import pandas as pd
 from pathlib import Path
 from yafw.project_management import Context, Global
 app = typer.Typer()
@@ -148,6 +149,75 @@ def create_job(
     ctx.obj.project.save()
 
 @app.command()
+def merge_classes(
+    files: list[str] = typer.Argument(..., help="List of .par files to merge"),
+    out_prefix: str = typer.Argument(..., help="Output prefix for the merged file without extention"),
+    threshold: int = typer.Option(None, help="Occupancy threshold for filtering particles")
+):
+    
+    if threshold is None:
+        threshold = 50 #Default value
+
+    dataframes = {}
+    for file in files:
+        file_key = file.split('/')[-1].split('.')[0]
+        dataframes[file_key] = pd.read_table(file, sep="\s+", comment="C", header=None)
+    column_11_values = {}
+    for key, df in dataframes.items():
+        column_11_values[key] = df[11].values
+        
+    values_df = pd.DataFrame(column_11_values)
+
+    values_df['sum'] = values_df.sum(axis=1)
+    val_df = values_df[values_df['sum'] >= threshold].copy()
+    val_df['max'] = val_df.iloc[:,:-1].idxmax(axis=1)
+
+    # Code for threshold before sum Occupancy
+    #values_df["treshold"] = values_df.max(axis=1)
+    #val_df = values_df[values_df["treshold"] >= threshold].copy()
+    #val_df["sum"] = val_df.iloc[:,:-1].sum(axis=1)
+    #val_df['max'] = val_df.iloc[:,:-2].idxmax(axis=1)
+    
+    val_df["index"] = val_df.index.to_series()+1
+    
+    grouped_data = val_df[["sum", 'max', 'index']].groupby('max').agg(list).reset_index()
+    
+    output_df = {}
+    for key in grouped_data.itertuples():
+        df = dataframes[key.max].copy()
+        df_ = df[df[0].isin(key.index)].copy()
+        df_.loc[:, 11] = key.sum
+        output_df[key.max] = df_
+        
+    output = pd.concat(output_df.values())
+    output = output.drop_duplicates(subset=[0])
+    output = output.sort_values(by=[0])
+    
+    with open(out_prefix+".par", "w") as f:
+        for particle in output.itertuples():
+            f.write("%7d%8.2f%8.2f%8.2f%10.2f%10.2f%8d%6d%9.1f%9.1f%8.2f%8.2f%10d%11.4f%8.2f%8.2f\n" % (
+                int(particle._1),
+                float(particle._2),
+                float(particle._3),
+                float(particle._4),
+                float(particle._5),
+                float(particle._6),
+                int(particle._7),
+                int(particle._8),
+                float(particle._9),
+                float(particle._10),
+                float(particle._11),
+                float(particle._12),
+                int(particle._13),
+                float(particle._14),
+                float(particle._15),
+                float(particle._16)))
+        
+
+if __name__ == "__main__":
+     Filter_par_files()
+
+@app.command()
 def fsc_results(ctx: Context):
     from yafw.frealign_jobs import parse_job
     if ctx.obj is None or ctx.obj.job is None:
@@ -223,15 +293,14 @@ def fsc_results(ctx: Context):
     plt.show()  
 
 @app.command()
-def job_status(ctx: Context):
+def job_status(ctx: Context, until_round:int = -1):
     from yafw.frealign_jobs import parse_job
     if ctx.obj is None or ctx.obj.job is None:
         typer.echo("Please run in a FREALIGN job folder. Exiting.")
         raise typer.Exit(code=1)
     job_data = parse_job(ctx.obj.project, ctx.obj.job)
-
     import matplotlib.pyplot as plt
-    for class_n in range(job_data[-1][-1].class_n):
+    for class_n in range(job_data[-1][until_round].class_n):
         data = job_data[class_n]
         plt.plot([d.round for d in data], [d.avg_occ for d in data], label=f"Class {class_n+1}")
     plt.legend()
@@ -268,3 +337,4 @@ def main(
 
 if __name__ == "__main__":
     app()
+
