@@ -31,7 +31,8 @@ dependencies = [
   "starfile",
   "rich",
   "mrcfile",
-  "matplotlib"
+  "matplotlib",
+  "pandas"
 ]
 
 [project.scripts]
