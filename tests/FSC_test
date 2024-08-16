@@ -50,7 +50,7 @@ class FrealignResults(BaseModel):
     FSC: FSCCurve = FSCCurve()
 
 
-def parse_job(project: FrealignProject, job: FrealignJob) -> list[list[FrealignResults]]:
+def parse_job(project: FrealignProject, job: FrealignJob):
     from rich.progress import track
     par_files = list(job.path.glob(f"*.par"))
     results = []
@@ -64,7 +64,6 @@ def parse_job(project: FrealignProject, job: FrealignJob) -> list[list[FrealignR
         if match:
             round_n = int(match.group(1))
             class_n = int(match.group(2))
-            print(round_n,class_n)
             result = FrealignResults(round=round_n, class_n=class_n)
             results.append(result)
             # Read the par file and extract the occupancy values
@@ -91,7 +90,6 @@ def parse_job(project: FrealignProject, job: FrealignJob) -> list[list[FrealignR
                     result.FSC.part_fsc_values.append(float(splitline[6]))
                     continue
     results.sort(key=lambda x: (x.round, x.class_n))
-    print(results)
     per_class_results = []
     for class_n in range(1, results[-1].class_n+1):
         round_results = [result for result in results if result.class_n == class_n]
