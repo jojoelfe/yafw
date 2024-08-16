@@ -1,5 +1,4 @@
 import typer
-import pandas as pd
 from pathlib import Path
 from yafw.project_management import Context, Global
 app = typer.Typer()
@@ -154,7 +153,8 @@ def merge_classes(
     out_prefix: str = typer.Argument(..., help="Output prefix for the merged file without extention"),
     threshold: int = typer.Option(None, help="Occupancy threshold for filtering particles")
 ):
-    
+    import pandas as pd
+
     if threshold is None:
         threshold = 50 #Default value
 
@@ -212,10 +212,53 @@ def merge_classes(
                 float(particle._14),
                 float(particle._15),
                 float(particle._16)))
-        
 
-if __name__ == "__main__":
-     Filter_par_files()
+
+@app.command()
+def convertpar2star (
+    parfile: Path = typer.Argument(..., help=".par file to convert to .star"),
+    parent_starfile : Path = typer.Argument(..., help=" Refined parent .star file, converted from cistem bineries"),
+    star_output : str = typer.Argument(..., help=" root output name of the new star file, has .star by default")
+):
+    import pandas as pd
+    import starfile
+
+    df = pd.read_table(parfile, sep="\s+", comment="C", header=None)
+    star_df = starfile.read(parent_starfile)
+
+    new_star = star_df[star_df.index.isin(df[0].values-1)]
+    starfile.write(new_star, f'{star_output}.star')
+
+@app.command()
+def convert2rlnstar (
+    cisTEMstar: Path = typer.Argument(..., help="cisTEM star file to convert"),
+    stack_path: str = typer.Argument(..., help='Path for the particles stack, white particles'), #normalized and converted using cisTEM
+    rlnstar_output: str = typer.Argument(..., help=" root output name of the rln star file, has .star by default")
+):
+    import pandas as pd
+    import starfile
+
+    cistem_star = starfile.read(cisTEMstar)
+    
+    new_vals = []
+    for i in cistem_star['cisTEMPositionInStack'].values:
+        new_vals.append("{:06d}@{}".format(i, stack_path))
+    cistem_star["rlnImageName"] = new_vals
+
+    new_column_order= ['rlnImageName','cisTEMDefocus1', 'cisTEMDefocus2', 'cisTEMDefocusAngle', 'cisTEMPhaseShift', 'cisTEMMicroscopeVoltagekV', 'cisTEMMicroscopeCsMM', 'cisTEMAmplitudeContrast','cisTEMPixelSize', 'cisTEMAnglePhi', 'cisTEMAngleTheta', 'cisTEMAnglePsi', 'cisTEMXShift', 'cisTEMYShift' ]
+    new_star = cistem_star[new_column_order]
+    relion_columns = new_star.rename(columns = {'rlnImageName':'rlnImageName', 'cisTEMDefocus1':'rlnDefocusU', 'cisTEMDefocus2':'rlnDefocusV', 'cisTEMDefocusAngle': 'rlnDefocusAngle', 'cisTEMPhaseShift': 'rlnPhaseShift', 'cisTEMMicroscopeVoltagekV':'rlnVoltage', 'cisTEMMicroscopeCsMM': 'rlnSphericalAberration', 'cisTEMAmplitudeContrast': 'rlnAmplitudeContrast', 'cisTEMPixelSize': 'rlnDetectorPixelSize','cisTEMAnglePhi':'rlnAngleRot', 'cisTEMAngleTheta': 'rlnAngleTilt', 'cisTEMAnglePsi': 'rlnAnglePsi', 'cisTEMXShift': 'rlnOriginXAngst','cisTEMYShift': 'rlnOriginYAngst'})
+    row_count = len(relion_columns)
+    columns2add = pd.DataFrame({
+            'rlnMicrographName':['unkown.mrc']*row_count,
+            'rlnCoordinateX' : ['0.000000']*row_count,
+            'rlnCoordinateY' : ['0.000000']*row_count,
+            'rlnMagnification': ['10000.000000']*row_count 
+            })
+    complete_star = relion_columns.join(columns2add)
+    sorted_column_order = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY', 'rlnImageName', 'rlnDefocusU', 'rlnDefocusV', 'rlnDefocusAngle', 'rlnPhaseShift', 'rlnVoltage', 'rlnSphericalAberration', 'rlnAmplitudeContrast', 'rlnMagnification', 'rlnDetectorPixelSize', 'rlnAngleRot', 'rlnAngleTilt', 'rlnAnglePsi', 'rlnOriginXAngst', 'rlnOriginYAngst'] 
+    sorted_relion_star = complete_star[sorted_column_order]
+    starfile.write(sorted_relion_star, rlnstar_output)
 
 @app.command()
 def fsc_results(ctx: Context):
@@ -306,29 +349,6 @@ def job_status(ctx: Context, until_round:int = -1):
     plt.legend()
     plt.show()
 
-@app.command()
-def continue_job(ctx: Context, nrounds: int = typer.Argument(1, help="Number of rounds to continue")):
-    from yafw.frealign_jobs import continue_job
-    if ctx.obj is None or ctx.obj.job is None:
-        typer.echo("Please run in a FREALIGN job folder. Exiting.")
-        raise typer.Exit(code=1)
-    continue_job(ctx.obj.project, ctx.obj.job, nrounds=nrounds)
-
-@app.command()
-def combine_classes(ctx: Context,
-                    name: str = typer.Argument(..., help="Name of the new particle set"),
-                    job_id: int = typer.Argument(..., help="Job ID to combine classes from"),
-                    class_numbers: list[str] = typer.Argument(..., help="Class numbers to combine"),
-                    iteration: int = typer.Option(-1, help="Iteration number to combine classes from, -1 is the latest")):
-    
-    from yafw.frealign_jobs import combine_classes
-    if ctx.obj is None:
-        typer.echo("Please run in a FREALIGN project folder. Exiting.")
-        raise typer.Exit(code=1)
-    job = list(filter(lambda x: x.id == job_id, ctx.obj.project.jobs))[0]
-    combine_classes(project=ctx.obj.project, name=name, job=job, class_numbers=class_numbers, iteration=iteration)
-    
-
 @app.callback()
 def main(
     ctx: Context,
@@ -356,6 +376,30 @@ def main(
             )
         ctx.obj = Global(project=project,
                          job=job)
+
+
+@app.command()
+def continue_job(ctx: Context, nrounds: int = typer.Argument(1, help="Number of rounds to continue")):
+    from yafw.frealign_jobs import continue_job
+    if ctx.obj is None or ctx.obj.job is None:
+        typer.echo("Please run in a FREALIGN job folder. Exiting.")
+        raise typer.Exit(code=1)
+    continue_job(ctx.obj.project, ctx.obj.job, nrounds=nrounds)
+
+@app.command()
+def combine_classes(ctx: Context,
+                    name: str = typer.Argument(..., help="Name of the new particle set"),
+                    job_id: int = typer.Argument(..., help="Job ID to combine classes from"),
+                    class_numbers: list[str] = typer.Argument(..., help="Class numbers to combine"),
+                    iteration: int = typer.Option(-1, help="Iteration number to combine classes from, -1 is the latest")):
+    
+    from yafw.frealign_jobs import combine_classes
+    if ctx.obj is None:
+        typer.echo("Please run in a FREALIGN project folder. Exiting.")
+        raise typer.Exit(code=1)
+    job = list(filter(lambda x: x.id == job_id, ctx.obj.project.jobs))[0]
+    combine_classes(project=ctx.obj.project, name=name, job=job, class_numbers=class_numbers, iteration=iteration)
+    
 
 
 if __name__ == "__main__":
